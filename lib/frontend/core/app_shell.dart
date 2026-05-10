@@ -12,33 +12,50 @@ class AppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final isTablet  = width >= 768;
-    final isDesktop = width >= 1100;
+    return BlocListener<AuthBloc, AuthState>(
+      listener: (context, state) {
+        if (state is AuthUnauthenticated) {
+          context.go('/login');
+        }
+      },
+      child: Builder(
+        builder: (context) {
+          final width = MediaQuery.of(context).size.width;
+          final isTablet = width >= 768;
+          final isDesktop = width >= 1100;
 
-    if (isTablet) {
-      return Scaffold(
-        body: Row(children: [
-          _Sidebar(location: location, collapsed: !isDesktop),
-          Expanded(
-            child: Column(children: [
-              _TopBar(location: location),
-              Expanded(child: child),
-            ]),
-          ),
-        ]),
-      );
-    }
+          if (isTablet) {
+            return Scaffold(
+              body: Row(
+                children: [
+                  _Sidebar(location: location, collapsed: !isDesktop),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        _TopBar(location: location),
+                        Expanded(child: child), // This child is your PosScreen
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
 
-    return Scaffold(
-      drawer: Drawer(
-        backgroundColor: AppColors.bgSidebar,
-        child: _SidebarContent(location: location, collapsed: false),
+          return Scaffold(
+            drawer: Drawer(
+              backgroundColor: AppColors.bgSidebar,
+              child: _SidebarContent(location: location, collapsed: false),
+            ),
+            body: Column(
+              children: [
+                _TopBar(location: location, showMenu: true),
+                Expanded(child: child),
+              ],
+            ),
+          );
+        },
       ),
-      body: Column(children: [
-        _TopBar(location: location, showMenu: true),
-        Expanded(child: child),
-      ]),
     );
   }
 }
@@ -66,6 +83,30 @@ class _SidebarContent extends StatelessWidget {
   final bool collapsed;
   const _SidebarContent({required this.location, required this.collapsed});
 
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirm Logout'),
+        content: const Text('Are you sure you want to log out?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              context.read<AuthBloc>().add(AuthLogoutEvent());
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
+            child: const Text('Logout', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = context.watch<AuthBloc>().state;
@@ -77,6 +118,7 @@ class _SidebarContent extends StatelessWidget {
       color: AppColors.bgSidebar,
       child: SafeArea(
         child: Column(children: [
+          const SizedBox(height: 12),
           // Logo
           Container(
             height: 64,
@@ -104,9 +146,12 @@ class _SidebarContent extends StatelessWidget {
                     child: const Icon(Icons.restaurant_menu, color: Colors.white, size: 18),
                   ),
                   const SizedBox(width: 12),
-                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('RestaurantOS', style: AppText.bodyMedium.copyWith(fontWeight: FontWeight.w700)),
-                    Text('v2.0', style: AppText.small.copyWith(fontSize: 10)),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start, 
+                    mainAxisAlignment: MainAxisAlignment.center, 
+                  children: [
+                    Text('Boba Food', style: AppText.bodyMedium.copyWith(fontWeight: FontWeight.w700)),
+                    Text('Food for everybody', style: AppText.small.copyWith(fontSize: 10)),
                   ]),
                 ]),
           ),
@@ -140,37 +185,36 @@ class _SidebarContent extends StatelessWidget {
             ),
           ),
 
-          // User footer
+          // Logout button (instead of user info)
           Container(
             padding: EdgeInsets.all(collapsed ? 8 : 14),
             decoration: const BoxDecoration(
               border: Border(top: BorderSide(color: AppColors.border)),
             ),
             child: collapsed
-              ? UserAvatar(name: user?.name ?? 'User', size: 36)
-              : Row(children: [
-                  UserAvatar(name: user?.name ?? 'User', size: 36),
-                  const SizedBox(width: 10),
-                  Expanded(child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        user?.name ?? 'User',
-                        style: AppText.bodyMedium,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        (user?.role ?? '').toUpperCase(),
-                        style: AppText.label,
-                      ),
-                    ],
-                  )),
-                  IconButton(
-                    icon: const Icon(Icons.logout, size: 16, color: AppColors.textSecondary),
-                    onPressed: () => context.read<AuthBloc>().add(AuthLogoutEvent()),
+              ? Tooltip(
+                  message: 'Logout',
+                  child: IconButton(
+                    icon: const Icon(Icons.logout, size: 20, color: AppColors.danger),
+                    onPressed: () => _showLogoutDialog(context),
                   ),
-                ]),
+                )
+              : SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.logout, size: 18),
+                    label: const Text('Logout'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.danger,
+                      side: const BorderSide(color: AppColors.danger),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                    ),
+                    onPressed: () => _showLogoutDialog(context),
+                  ),
+                ),
           ),
         ]),
       ),

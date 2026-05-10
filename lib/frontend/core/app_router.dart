@@ -17,13 +17,12 @@ import 'package:rms_app/frontend/bloc/menu_bloc.dart';
 import 'package:rms_app/frontend/screens/menu_screen.dart';
 import 'package:rms_app/frontend/screens/order_screen.dart';
 import 'package:rms_app/frontend/bloc/orders_bloc.dart';
-import 'package:rms_app/frontend/bloc/pos_bloc.dart';
-import 'package:rms_app/frontend/screens/pos_screen.dart';
 import 'package:rms_app/frontend/screens/report_screen.dart';
 import 'package:rms_app/frontend/screens/reservation_screen.dart';
 import 'package:rms_app/frontend/screens/setting_screen.dart';
 import 'package:rms_app/frontend/screens/table_screen.dart';
 import 'package:rms_app/frontend/bloc/tables_bloc.dart';
+import 'package:rms_app/frontend/screens/pos_screen.dart';
 
 
 class AppRouter {
@@ -113,10 +112,7 @@ class AppRouter {
           ),
           GoRoute(
             path: '/pos',
-            builder: (_, __) => BlocProvider(
-              create: (_) => getIt<PosBloc>(),
-              child: const PosScreen(),
-            ),
+            builder: (_, __) => const PosScreen(),
           ),
           GoRoute(
             path: '/inventory',

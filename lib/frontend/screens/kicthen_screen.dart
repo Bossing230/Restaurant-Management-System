@@ -21,7 +21,6 @@ class KitchenScreen extends StatelessWidget {
           return Column(children: [
             // Live header strip
             Container(
-              color: AppColors.bgCard,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               decoration: const BoxDecoration(
                 border: Border(bottom: BorderSide(color: AppColors.border)),

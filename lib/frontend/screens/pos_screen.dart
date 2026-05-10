@@ -1,53 +1,56 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-//import 'package:intl/intl.dart';
+import 'package:rms_app/frontend/bloc/menu_bloc.dart';
 import 'package:rms_app/frontend/core/app_theme.dart';
 import 'package:rms_app/frontend/core/shared_widgets.dart';
 import 'package:rms_app/frontend/bloc/pos_bloc.dart';
 
-//final _cur = NumberFormat.currency(symbol: '₱', decimalDigits: 2);
-
 class PosScreen extends StatelessWidget {
   const PosScreen({super.key});
 
-  // Static menu items — in production these come from MenuBloc
-  static const _menu = [
-    (1,  'Beef Sinigang',   185.0, 'Main Course'),
-    (2,  'Chicken Adobo',   165.0, 'Main Course'),
-    (3,  'Pork Sisig',      175.0, 'Main Course'),
-    (4,  'Kare-Kare',       220.0, 'Main Course'),
-    (5,  'Pancit Canton',   145.0, 'Noodles'),
-    (6,  'Palabok',         155.0, 'Noodles'),
-    (7,  'Halo-Halo',        95.0, 'Desserts'),
-    (8,  'Leche Flan',       75.0, 'Desserts'),
-    (9,  'Buko Pandan',      85.0, 'Desserts'),
-    (10, 'Sago Gulaman',     55.0, 'Drinks'),
-    (11, 'Calamansi Juice',  65.0, 'Drinks'),
-    (12, 'Halo-Halo Shake', 115.0, 'Drinks'),
-  ];
+  @override
+  Widget build(BuildContext context) {
+    // Make sure BLoCs are available
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider.value(value: context.read<MenuBloc>()),
+        BlocProvider.value(value: context.read<PosBloc>()),
+      ],
+      child: const PosScreenContent(),
+    );
+  }
+}
+
+class PosScreenContent extends StatelessWidget {
+  const PosScreenContent({super.key});
 
   @override
   Widget build(BuildContext context) {
     return BlocListener<PosBloc, PosState>(
-      listenWhen: (prev, curr) => curr.lastOrderId != null,
+      listenWhen: (prev, curr) => curr.lastOrderId != null && prev.lastOrderId != curr.lastOrderId,
       listener: (ctx, state) {
-        if (state.lastOrderId != null) _showSuccess(ctx, state.lastOrderId!);
+        if (state.lastOrderId != null) {
+          _showSuccess(ctx, state.lastOrderId!);
+        }
       },
       child: BlocBuilder<PosBloc, PosState>(
         builder: (ctx, state) {
           final isWide = MediaQuery.of(ctx).size.width > 720;
           if (isWide) {
-            return Row(children: [
-              Expanded(flex: 3, child: _MenuPanel(menu: _menu)),
-              Container(width: 1, color: AppColors.border),
-              SizedBox(width: 300, child: _CartPanel(state: state)),
-            ]);
+            return Row(
+              children: [
+                Expanded(flex: 3, child: const _MenuPanel()),
+                Container(width: 1, color: AppColors.border),
+                SizedBox(width: 300, child: _CartPanel(state: state)),
+              ],
+            );
           }
-          return Column(children: [
-            Expanded(child: _MenuPanel(menu: _menu)),
-            if (state.cart.isNotEmpty)
-              _CartSummaryBar(state: state),
-          ]);
+          return Column(
+            children: [
+              Expanded(child: const _MenuPanel()),
+              if (state.cart.isNotEmpty) _CartSummaryBar(state: state),
+            ],
+          );
         },
       ),
     );
@@ -56,25 +59,34 @@ class PosScreen extends StatelessWidget {
   void _showSuccess(BuildContext context, String orderId) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      barrierDismissible: true,
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.lg)),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-            width: 56, height: 56,
-            decoration: const BoxDecoration(
-              color: AppColors.successBg, shape: BoxShape.circle),
-            child: const Icon(Icons.check, color: AppColors.success, size: 28),
-          ),
-          const SizedBox(height: 16),
-          const Text('Order placed!', style: AppText.h4),
-          const SizedBox(height: 6),
-          Text('Order $orderId sent to kitchen.',
-            textAlign: TextAlign.center, style: AppText.small),
-        ]),
+        content: Column(
+          mainAxisSize: MainAxisSize.min, 
+          children: [
+            Container(
+              width: 56, 
+              height: 56,
+              decoration: const BoxDecoration(
+                color: AppColors.successBg, 
+                shape: BoxShape.circle),
+              child: const Icon(Icons.check, color: AppColors.success, size: 28),
+            ),
+            const SizedBox(height: 16),
+            const Text('Order placed!', style: AppText.h4),
+            const SizedBox(height: 6),
+            Text('Order $orderId sent to kitchen.',
+              textAlign: TextAlign.center, 
+              style: AppText.small),
+          ],
+        ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+            },
             child: const Text('Done'),
           ),
         ],
@@ -84,155 +96,328 @@ class PosScreen extends StatelessWidget {
 }
 
 // ── Menu panel ────────────────────────────────────────────────
-class _MenuPanel extends StatefulWidget {
-  final List<(int, String, double, String)> menu;
-  const _MenuPanel({required this.menu});
-  @override State<_MenuPanel> createState() => _MenuPanelState();
-}
-
-class _MenuPanelState extends State<_MenuPanel> {
-  String _cat = 'All';
+class _MenuPanel extends StatelessWidget {
+  const _MenuPanel();
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<PosBloc>().state;
-    final cats  = ['All', ...widget.menu.map((m) => m.$4).toSet()];
-    final items = _cat == 'All'
-        ? widget.menu
-        : widget.menu.where((m) => m.$4 == _cat).toList();
+    return BlocBuilder<MenuBloc, MenuState>(
+      builder: (context, menuState) {
+        // Handle different states properly
+        if (menuState is MenuLoading) {
+          // Show empty content while loading (no loading spinner)
+          return const _MenuPanelContent(menuState: null);
+        }
+        
+        if (menuState is MenuError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 48, color: AppColors.danger),
+                const SizedBox(height: 16),
+                Text('Error: ${menuState.message}', style: AppText.bodyMedium),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => context.read<MenuBloc>().add(MenuLoadEvent()),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          );
+        }
+        
+        if (menuState is MenuLoaded) {
+          return _MenuPanelContent(menuState: menuState);
+        }
+        
+        // Default - show empty panel
+        return const _MenuPanelContent(menuState: null);
+      },
+    );
+  }
+}
 
-    return Column(children: [
-      // Table + type selector
-      Container(
-        color: AppColors.bgCard,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Row(children: [
-          const Icon(Icons.table_restaurant_outlined,
-              size: 16, color: AppColors.textSecondary),
-          const SizedBox(width: 6),
-          DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: state.table.isEmpty ? null : state.table,
-              hint: const Text('Table', style: TextStyle(fontSize: 13)),
-              isDense: true,
-              icon: const Icon(Icons.keyboard_arrow_down, size: 14),
-              items: List.generate(10, (i) => 'T${i + 1}')
-                  .map((t) => DropdownMenuItem(
-                        value: t,
-                        child: Text(t, style: const TextStyle(fontSize: 13)),
-                      ))
-                  .toList(),
-              onChanged: (v) {
-                if (v != null) {
-                  context.read<PosBloc>().add(PosSetTableEvent(v));
-                }
-              },
+class _MenuPanelContent extends StatefulWidget {
+  final MenuLoaded? menuState;
+  const _MenuPanelContent({this.menuState});
+
+  @override
+  State<_MenuPanelContent> createState() => _MenuPanelContentState();
+}
+
+class _MenuPanelContentState extends State<_MenuPanelContent> {
+  String _cat = 'All';
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    final posState = context.watch<PosBloc>().state;
+    
+    // Get categories and items from menuState (handle null)
+    final categories = widget.menuState?.categories ?? ['All', 'Main Course', 'Noodles', 'Desserts', 'Drinks'];
+    
+    final items = widget.menuState?.filtered.where((item) {
+      if (_cat != 'All' && item.category != _cat) return false;
+      if (_searchQuery.isNotEmpty && 
+          !item.name.toLowerCase().contains(_searchQuery.toLowerCase())) {
+        return false;
+      }
+      return true;  
+    }).toList() ?? [];
+
+    // If no items, show empty state with header
+    if (items.isEmpty) {
+      return Column(
+        children: [
+          _buildHeader(posState),
+          _buildSearchBar(),
+          if (categories.isNotEmpty && categories.first != 'All') _buildCategoryTabs(categories),
+          const Expanded(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.restaurant_menu, size: 48, color: AppColors.textHint),
+                  SizedBox(height: 16),
+                  Text('No menu items found', style: AppText.bodyMedium),
+                  SizedBox(height: 8),
+                  Text('Try a different category', style: AppText.small),
+                ],
+              ),
             ),
           ),
-          const SizedBox(width: 16),
-          ...['Dine-in', 'Takeout', 'Delivery'].map((t) {
-            final active = state.orderType == t;
+        ],
+      );
+    }
+
+    return Column(
+      children: [
+        _buildHeader(posState),
+        _buildSearchBar(),
+        if (categories.isNotEmpty && categories.length > 1) _buildCategoryTabs(categories),
+        Expanded(
+          child: GridView.builder(
+            padding: const EdgeInsets.all(12),
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 160,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: 0.9,
+            ),
+            itemCount: items.length,
+            itemBuilder: (ctx2, i) {
+              final item = items[i];
+              return GestureDetector(
+                onTap: item.available
+                    ? () => ctx2.read<PosBloc>().add(PosAddEvent(item.id, item.name, item.price))
+                    : null,
+                child: AppCard(
+                  padding: const EdgeInsets.all(8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: (item.imageUrl != null && item.imageUrl!.isNotEmpty)
+                            ? Image.asset(
+                                item.imageUrl!,
+                                height: 80,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) => 
+                                    _buildImagePlaceholder(),
+                              )
+                            : _buildImagePlaceholder(),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        item.name,
+                        style: AppText.small.copyWith(
+                          fontWeight: FontWeight.w500,
+                          color: item.available ? AppColors.textPrimary : AppColors.textSecondary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        item.category,
+                        style: AppText.small.copyWith(
+                          fontSize: 10,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '₱${item.price.toStringAsFixed(0)}',
+                            style: AppText.bodyMedium.copyWith(
+                              color: item.available ? AppColors.primary : AppColors.textSecondary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          if (!item.available)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.danger.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'Sold out',
+                                style: TextStyle(fontSize: 8, color: AppColors.danger),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeader(PosState posState) {
+    return Container(
+      color: AppColors.bgCard,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(children: [
+        const Icon(Icons.table_restaurant_outlined,
+            size: 16, color: AppColors.textSecondary),
+        const SizedBox(width: 6),
+        DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            value: posState.table.isEmpty ? null : posState.table,
+            hint: const Text('Table', style: TextStyle(fontSize: 13)),
+            isDense: true,
+            icon: const Icon(Icons.keyboard_arrow_down, size: 14),
+            items: List.generate(10, (i) => 'T${i + 1}')
+                .map((t) => DropdownMenuItem(
+                      value: t,
+                      child: Text(t, style: const TextStyle(fontSize: 13)),
+                    ))
+                .toList(),
+            onChanged: (v) {
+              if (v != null) {
+                context.read<PosBloc>().add(PosSetTableEvent(v));
+              }
+            },
+          ),
+        ),
+        const SizedBox(width: 16),
+        ...['Dine-in', 'Takeout', 'Delivery'].map((t) {
+          final active = posState.orderType == t;
+          return GestureDetector(
+            onTap: () => context.read<PosBloc>().add(PosSetTypeEvent(t)),
+            child: Container(
+              margin: const EdgeInsets.only(right: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: active ? AppColors.primary : AppColors.bgInput,
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+                border: Border.all(
+                  color: active ? AppColors.primary : AppColors.border),
+              ),
+              child: Text(t, style: TextStyle(
+                fontSize: 11,
+                color: active ? Colors.white : AppColors.textSecondary,
+                fontWeight: FontWeight.w500,
+              )),
+            ),
+          );
+        }),
+      ]),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: TextField(
+        controller: _searchController,
+        decoration: InputDecoration(
+          hintText: 'Search menu...',
+          prefixIcon: const Icon(Icons.search, size: 20),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear, size: 20),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                )
+              : null,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            borderSide: const BorderSide(color: AppColors.border),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        ),
+        onChanged: (value) {
+          setState(() => _searchQuery = value);
+        },
+      ),
+    );
+  }
+
+  Widget _buildCategoryTabs(List<String> categories) {
+    // Filter out empty categories
+    final validCategories = categories.where((c) => c.isNotEmpty).toList();
+    if (validCategories.isEmpty || validCategories.length <= 1) return const SizedBox.shrink();
+    
+    return Container(
+      color: AppColors.bgCard,
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: validCategories.map((c) {
+            final active = c == _cat;
             return GestureDetector(
-              onTap: () =>
-                  context.read<PosBloc>().add(PosSetTypeEvent(t)),
+              onTap: () => setState(() => _cat = c),
               child: Container(
                 margin: const EdgeInsets.only(right: 6),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 decoration: BoxDecoration(
                   color: active ? AppColors.primary : AppColors.bgInput,
                   borderRadius: BorderRadius.circular(AppRadius.pill),
-                  border: Border.all(
-                    color: active ? AppColors.primary : AppColors.border),
                 ),
-                child: Text(t, style: TextStyle(
-                  fontSize: 11,
+                child: Text(c, style: TextStyle(
+                  fontSize: 12,
                   color: active ? Colors.white : AppColors.textSecondary,
-                  fontWeight: FontWeight.w500,
                 )),
               ),
             );
-          }),
-        ]),
-      ),
-
-      // Category tabs
-      Container(
-        color: AppColors.bgCard,
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: cats.map((c) {
-              final active = c == _cat;
-              return GestureDetector(
-                onTap: () => setState(() => _cat = c),
-                child: Container(
-                  margin: const EdgeInsets.only(right: 6),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: active ? AppColors.primary : AppColors.bgInput,
-                    borderRadius: BorderRadius.circular(AppRadius.pill),
-                  ),
-                  child: Text(c, style: TextStyle(
-                    fontSize: 12,
-                    color: active ? Colors.white : AppColors.textSecondary,
-                  )),
-                ),
-              );
-            }).toList(),
-          ),
+          }).toList(),
         ),
       ),
+    );
+  }
 
-      // Menu grid
-      Expanded(
-        child: GridView.builder(
-          padding: const EdgeInsets.all(12),
-          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 160,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: 1.1,
-          ),
-          itemCount: items.length,
-          itemBuilder: (ctx2, i) {
-            final (id, name, price, cat) = items[i];
-            return GestureDetector(
-              onTap: () => ctx2.read<PosBloc>()
-                  .add(PosAddEvent(id, name, price)),
-              child: AppCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryLight,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Center(child: Icon(
-                        Icons.restaurant_outlined,
-                        color: AppColors.primary,
-                        size: 24,
-                      )),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(name, style: AppText.bodyMedium,
-                        maxLines: 1, overflow: TextOverflow.ellipsis),
-                    Text(cat, style: AppText.small),
-                    const SizedBox(height: 4),
-                    Text('₱${price.toStringAsFixed(0)}',
-                      style: AppText.h4.copyWith(color: AppColors.primary)),
-                  ],
-                ),
-              ),
-            );
-          },
+  Widget _buildImagePlaceholder() {
+    return Container(
+      height: 80,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.primaryLight,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Center(
+        child: Icon(
+          Icons.restaurant_outlined,
+          color: AppColors.primary,
+          size: 30,
         ),
       ),
-    ]);
+    );
   }
 }
 
@@ -299,7 +484,7 @@ class _CartItemRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       child: Row(children: [
         _QtyBtn(
           icon: Icons.remove,
