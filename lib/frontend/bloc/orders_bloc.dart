@@ -99,7 +99,7 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
     try {
       final res = await _api.dio.get(ApiConstants.orders);
       emit(OrdersLoaded(
-        all: (res.data['data'] as List).map(OrderModel.fromJson).toList(),
+        all: (res.data['data'] as List<dynamic>).map((e) => OrderModel.fromJson(e as Map<String, dynamic>)).toList(),
       ));
     } catch (_) {
       emit(OrdersLoaded(all: _mockOrders));

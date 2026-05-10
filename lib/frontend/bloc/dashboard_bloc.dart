@@ -194,11 +194,11 @@ class DashboardBloc extends Bloc<DashboardEvent, DashboardState> {
 
       emit(DashboardLoaded(
         summary:      DashboardSummary.fromJson(results[0].data['data'] as Map<String, dynamic>),
-        salesData:    (results[1].data['data'] as List).map((e) => SalesPoint(e['label'] as String, double.parse(e['amount'].toString()), orderCount: int.parse((e['order_count'] ?? 0).toString()))).toList(),
-        topItems:     (results[2].data['data'] as List).map(TopItem.fromJson).toList(),
-        alerts:       (results[3].data['data'] as List).map(DashboardAlert.fromJson).toList(),
-        staff:        (results[4].data['data'] as List).map(StaffMember.fromJson).toList(),
-        recentOrders: (results[5].data['data'] as List).map(RecentOrder.fromJson).toList(),
+        salesData:    (results[1].data['data'] as List<dynamic>).map((e) => SalesPoint(e['label'] as String, double.parse(e['amount'].toString()), orderCount: int.parse((e['order_count'] ?? 0).toString()))).toList(),
+        topItems:     (results[2].data['data'] as List<dynamic>).map((e) => TopItem.fromJson(e as Map<String, dynamic>)).toList(),
+        alerts:       (results[3].data['data'] as List<dynamic>).map((e) => DashboardAlert.fromJson(e as Map<String, dynamic>)).toList(),
+        staff:        (results[4].data['data'] as List<dynamic>).map((e) => StaffMember.fromJson(e as Map<String, dynamic>)).toList(),
+        recentOrders: (results[5].data['data'] as List<dynamic>).map((e) => RecentOrder.fromJson(e as Map<String, dynamic>)).toList(),
         range:        event.range,
       ));
     } catch (_) {

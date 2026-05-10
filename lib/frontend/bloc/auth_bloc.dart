@@ -124,17 +124,30 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         ApiConstants.login,
         data: {'email': event.email.trim(), 'password': event.password},
       );
+      // Backend returns: { success: true, data: { token, refresh_token, user: {...} } }
       final data = res.data['data'] as Map<String, dynamic>;
-      await _storage.write(key: AppConstants.tokenKey,   value: data['token'] as String);
-      await _storage.write(key: AppConstants.refreshKey, value: data['refresh_token'] as String);
-      currentUser = UserModel.fromJson(data['user'] as Map<String, dynamic>);
+
+      await _storage.write(
+        key: AppConstants.tokenKey,
+        value: (data['token'] as String),
+      );
+      await _storage.write(
+        key: AppConstants.refreshKey,
+        value: (data['refresh_token'] as String),
+      );
+
+      // Backend role field is role: user.role_name
+      final userJson = data['user'] as Map<String, dynamic>;
+      currentUser = UserModel.fromJson(userJson);
+
       await _storage.write(
         key: AppConstants.userKey,
         value: jsonEncode(currentUser!.toJson()),
       );
       emit(AuthAuthenticated(currentUser!));
     } catch (e) {
-      emit(AuthError('Invalid credentials. Please try again.'));
+      print('Login Error: $e');
+      emit(AuthError(e.toString()));
     }
   }
 
@@ -155,8 +168,8 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _form    = GlobalKey<FormState>();
-  final _email   = TextEditingController(text: 'admin@restaurant.com');
-  final _pass    = TextEditingController(text: 'password123');
+  final _email   = TextEditingController();
+  final _pass    = TextEditingController();
   bool _obscure  = true;
 
   // Quick login roles
@@ -231,7 +244,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 20),
                 Text('Welcome back', style: AppText.h2),
                 const SizedBox(height: 6),
-                Text('Sign in to RestaurantOS', style: AppText.small),
+                Text('Sign in to Boba Food', style: AppText.small),
                 const SizedBox(height: 32),
 
                 // Quick role selector

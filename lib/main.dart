@@ -23,7 +23,7 @@ class RestaurantApp extends StatelessWidget {
         ),
       ],
       child: MaterialApp.router(
-        title: 'RestaurantOS',
+        title: 'Boba App',
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,
         themeMode: ThemeMode.light,

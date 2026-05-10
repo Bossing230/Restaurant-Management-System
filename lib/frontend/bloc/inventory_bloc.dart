@@ -74,7 +74,7 @@ class InventoryBloc extends Bloc<InventoryEvent, InventoryState> {
     try {
       final res = await _api.dio.get(ApiConstants.inventory);
       emit(InventoryLoaded(
-        (res.data['data'] as List).map(InventoryItem.fromJson).toList(),
+        (res.data['data'] as List<dynamic>).map((e) => InventoryItem.fromJson(e as Map<String, dynamic>)).toList(),
       ));
     } catch (_) {
       emit(InventoryLoaded(_mock));
@@ -187,7 +187,7 @@ class CustomersBloc extends Bloc<CustomersEvent, CustomersState> {
     emit(CustomersLoading());
     try {
       final res = await _api.dio.get(ApiConstants.customers);
-      _all = (res.data['data'] as List).map(CustomerModel.fromJson).toList();
+      _all = (res.data['data'] as List<dynamic>).map((e) => CustomerModel.fromJson(e as Map<String, dynamic>)).toList();
       emit(CustomersLoaded(all: _all, filtered: _all));
     } catch (_) {
       _all = _mock;
@@ -310,7 +310,7 @@ class ReservationsBloc extends Bloc<ReservationsEvent, ReservationsState> {
           : <String, dynamic>{};
       final res = await _api.dio.get(ApiConstants.reservations, queryParameters: params);
       emit(ReservationsLoaded(
-        reservations: (res.data['data'] as List).map(ReservationModel.fromJson).toList(),
+        reservations: (res.data['data'] as List<dynamic>).map((e) => ReservationModel.fromJson(e as Map<String, dynamic>)).toList(),
         activeFilter: e.filter,
       ));
     } catch (_) {
@@ -409,8 +409,8 @@ class ReportsBloc extends Bloc<ReportsEvent, ReportsState> {
         _api.dio.get(ApiConstants.topItems),
         _api.dio.get(ApiConstants.reportsSummary),
       ]);
-      final sales  = (results[0].data['data'] as List).map((s) => SalesPoint(s['label'] as String, double.parse(s['amount'].toString()), orderCount: int.parse((s['order_count'] ?? 0).toString()))).toList();
-      final tops   = (results[1].data['data'] as List).map(ReportTopItem.fromJson).toList();
+      final sales  = (results[0].data['data'] as List<dynamic>).map((s) => SalesPoint(s['label'] as String, double.parse(s['amount'].toString()), orderCount: int.parse((s['order_count'] ?? 0).toString()))).toList();
+      final tops   = (results[1].data['data'] as List<dynamic>).map((e) => ReportTopItem.fromJson(e as Map<String, dynamic>)).toList();
       final sum    = results[2].data['data'] as Map<String, dynamic>;
       final total  = double.parse(sum['total_revenue'].toString());
       final orders = int.parse(sum['total_orders'].toString());

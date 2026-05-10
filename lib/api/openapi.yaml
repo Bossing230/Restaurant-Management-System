@@ -1,0 +1,489 @@
+openapi: 3.0.3
+info:
+  title: RestaurantOS API
+  description: |
+    Full REST API for RestaurantOS v2 Restaurant Management System.
+    All protected endpoints require a Bearer JWT token.
+  version: 2.0.0
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Local development
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:        { type: string, format: uuid }
+        name:      { type: string }
+        email:     { type: string, format: email }
+        role:      { type: string, enum: [admin, manager, cashier, kitchen] }
+        avatar_url: { type: string, nullable: true }
+
+    MenuItem:
+      type: object
+      properties:
+        id:          { type: integer }
+        name:        { type: string }
+        category:    { type: string }
+        category_id: { type: integer }
+        price:       { type: number }
+        description: { type: string, nullable: true }
+        available:   { type: boolean }
+
+    Order:
+      type: object
+      properties:
+        id:             { type: integer }
+        status:         { type: string, enum: [Pending,Preparing,Ready,Served,Completed,Cancelled] }
+        order_type:     { type: string, enum: [Dine-in,Takeout,Delivery] }
+        payment_method: { type: string, enum: [Cash,Card,E-wallet] }
+        subtotal:       { type: number }
+        tax:            { type: number }
+        total:          { type: number }
+        table_number:   { type: string, nullable: true }
+        items:          { type: array, items: { type: object } }
+        created_at:     { type: string, format: date-time }
+
+    RestaurantTable:
+      type: object
+      properties:
+        id:       { type: integer }
+        number:   { type: string }
+        capacity: { type: integer }
+        status:   { type: string, enum: [available,occupied,reserved,cleaning] }
+        section:  { type: string, nullable: true }
+
+    InventoryItem:
+      type: object
+      properties:
+        id:        { type: integer }
+        name:      { type: string }
+        category:  { type: string }
+        stock:     { type: number }
+        max_stock: { type: number }
+        min_stock: { type: number }
+        unit:      { type: string }
+
+    Customer:
+      type: object
+      properties:
+        id:             { type: string, format: uuid }
+        name:           { type: string }
+        email:          { type: string, nullable: true }
+        phone:          { type: string, nullable: true }
+        loyalty_points: { type: integer }
+        total_orders:   { type: integer }
+        total_spent:    { type: number }
+
+    Reservation:
+      type: object
+      properties:
+        id:            { type: integer }
+        customer_name: { type: string, nullable: true }
+        table_number:  { type: string, nullable: true }
+        reserved_at:   { type: string, format: date-time }
+        party_size:    { type: integer }
+        status:        { type: string, enum: [confirmed,seated,completed,cancelled,no-show] }
+        notes:         { type: string, nullable: true }
+
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                email:    { type: string }
+                password: { type: string }
+      responses:
+        '200': { description: Login successful }
+        '401': { description: Invalid credentials }
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      responses:
+        '200': { description: New token returned }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      security: [{ BearerAuth: [] }]
+      summary: Logout
+      responses:
+        '200': { description: Logged out }
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      security: [{ BearerAuth: [] }]
+      summary: Get current user
+      responses:
+        '200': { description: Current user data }
+
+  /dashboard/summary:
+    get:
+      tags: [Dashboard]
+      security: [{ BearerAuth: [] }]
+      summary: Aggregated metrics (cached 60s)
+      responses:
+        '200': { description: Dashboard summary }
+
+  /dashboard/sales:
+    get:
+      tags: [Dashboard]
+      security: [{ BearerAuth: [] }]
+      summary: Sales over time (cached 120s)
+      parameters:
+        - name: range
+          in: query
+          schema: { type: string, enum: [daily,weekly,monthly] }
+      responses:
+        '200': { description: Sales data }
+
+  /dashboard/alerts:
+    get:
+      tags: [Dashboard]
+      security: [{ BearerAuth: [] }]
+      summary: Active alerts (cached 30s)
+      responses:
+        '200': { description: Alerts list }
+
+  /dashboard/top-items:
+    get:
+      tags: [Dashboard]
+      security: [{ BearerAuth: [] }]
+      summary: Top items (cached 300s)
+      responses:
+        '200': { description: Top items }
+
+  /menu:
+    get:
+      tags: [Menu]
+      security: [{ BearerAuth: [] }]
+      summary: List menu items
+      parameters:
+        - name: category
+          in: query
+          schema: { type: string }
+      responses:
+        '200': { description: Menu items list }
+    post:
+      tags: [Menu]
+      security: [{ BearerAuth: [] }]
+      summary: Create menu item (Admin/Manager)
+      responses:
+        '201': { description: Item created }
+
+  /menu/categories:
+    get:
+      tags: [Menu]
+      security: [{ BearerAuth: [] }]
+      summary: List categories
+      responses:
+        '200': { description: Categories }
+
+  /menu/{id}:
+    put:
+      tags: [Menu]
+      security: [{ BearerAuth: [] }]
+      summary: Update menu item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: Item updated }
+    delete:
+      tags: [Menu]
+      security: [{ BearerAuth: [] }]
+      summary: Deactivate item (Admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: Item deactivated }
+
+  /orders:
+    get:
+      tags: [Orders]
+      security: [{ BearerAuth: [] }]
+      summary: List orders
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: date
+          in: query
+          schema: { type: string, format: date }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+        - name: offset
+          in: query
+          schema: { type: integer, default: 0 }
+      responses:
+        '200': { description: Orders list }
+    post:
+      tags: [Orders]
+      security: [{ BearerAuth: [] }]
+      summary: Create order (auto-deducts inventory)
+      responses:
+        '201': { description: Order created }
+
+  /orders/{id}:
+    get:
+      tags: [Orders]
+      security: [{ BearerAuth: [] }]
+      summary: Get single order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: Order detail }
+    delete:
+      tags: [Orders]
+      security: [{ BearerAuth: [] }]
+      summary: Cancel order (Admin/Manager)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: Order cancelled }
+
+  /orders/{id}/status:
+    put:
+      tags: [Orders]
+      security: [{ BearerAuth: [] }]
+      summary: Update order status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: Status updated }
+
+  /tables:
+    get:
+      tags: [Tables]
+      security: [{ BearerAuth: [] }]
+      summary: List all tables
+      responses:
+        '200': { description: Tables list }
+
+  /tables/{id}/status:
+    put:
+      tags: [Tables]
+      security: [{ BearerAuth: [] }]
+      summary: Update table status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: Status updated }
+
+  /inventory:
+    get:
+      tags: [Inventory]
+      security: [{ BearerAuth: [] }]
+      summary: List inventory
+      responses:
+        '200': { description: Inventory list }
+
+  /inventory/{id}:
+    put:
+      tags: [Inventory]
+      security: [{ BearerAuth: [] }]
+      summary: Update stock (Admin/Manager)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: Inventory updated }
+
+  /inventory/{id}/transactions:
+    get:
+      tags: [Inventory]
+      security: [{ BearerAuth: [] }]
+      summary: Get transaction history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: Transaction log }
+
+  /customers:
+    get:
+      tags: [Customers]
+      security: [{ BearerAuth: [] }]
+      summary: List customers
+      responses:
+        '200': { description: Customers list }
+    post:
+      tags: [Customers]
+      security: [{ BearerAuth: [] }]
+      summary: Create customer
+      responses:
+        '201': { description: Customer created }
+
+  /customers/{id}/orders:
+    get:
+      tags: [Customers]
+      security: [{ BearerAuth: [] }]
+      summary: Order history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Order history }
+
+  /customers/{id}/loyalty:
+    put:
+      tags: [Customers]
+      security: [{ BearerAuth: [] }]
+      summary: Update loyalty points
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Points updated }
+
+  /reservations:
+    get:
+      tags: [Reservations]
+      security: [{ BearerAuth: [] }]
+      summary: List reservations
+      parameters:
+        - name: date
+          in: query
+          schema: { type: string, format: date }
+        - name: status
+          in: query
+          schema: { type: string }
+      responses:
+        '200': { description: Reservations list }
+    post:
+      tags: [Reservations]
+      security: [{ BearerAuth: [] }]
+      summary: Create reservation
+      responses:
+        '201': { description: Reservation created }
+
+  /reservations/{id}/status:
+    put:
+      tags: [Reservations]
+      security: [{ BearerAuth: [] }]
+      summary: Update reservation status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: Status updated }
+
+  /reports/sales:
+    get:
+      tags: [Reports]
+      security: [{ BearerAuth: [] }]
+      summary: Sales report (Admin/Manager)
+      parameters:
+        - name: range
+          in: query
+          schema: { type: string, enum: [daily,weekly,monthly] }
+      responses:
+        '200': { description: Sales data }
+
+  /reports/top-items:
+    get:
+      tags: [Reports]
+      security: [{ BearerAuth: [] }]
+      summary: Top items last 30 days
+      responses:
+        '200': { description: Top items }
+
+  /reports/summary:
+    get:
+      tags: [Reports]
+      security: [{ BearerAuth: [] }]
+      summary: Revenue summary
+      responses:
+        '200': { description: Summary }
+
+  /staff:
+    get:
+      tags: [Staff]
+      security: [{ BearerAuth: [] }]
+      summary: Staff list (Admin/Manager)
+      responses:
+        '200': { description: Staff list }
+
+  /staff/{id}/status:
+    put:
+      tags: [Staff]
+      security: [{ BearerAuth: [] }]
+      summary: Update staff status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Status updated }
+
+  /staff/{id}/deactivate:
+    put:
+      tags: [Staff]
+      security: [{ BearerAuth: [] }]
+      summary: Deactivate account (Admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Account deactivated }
+
+  /settings/restaurant:
+    get:
+      tags: [Settings]
+      security: [{ BearerAuth: [] }]
+      summary: Get restaurant settings
+      responses:
+        '200': { description: Settings }
+    put:
+      tags: [Settings]
+      security: [{ BearerAuth: [] }]
+      summary: Update settings (Admin)
+      responses:
+        '200': { description: Updated }

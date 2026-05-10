@@ -77,7 +77,7 @@ class TablesBloc extends Bloc<TablesEvent, TablesState> {
     try {
       final res = await _api.dio.get(ApiConstants.tables);
       emit(TablesLoaded(
-        (res.data['data'] as List).map(TableModel.fromJson).toList(),
+        (res.data['data'] as List<dynamic>).map((e) => TableModel.fromJson(e as Map<String, dynamic>)).toList(),
       ));
     } catch (_) {
       emit(TablesLoaded(_mockTables));
